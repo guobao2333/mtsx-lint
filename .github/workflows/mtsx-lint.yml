@@ -1,0 +1,54 @@
+name: MTSX Lint
+
+on:
+  pull_request:
+    paths:
+      - 'mtsx/**/*.mtsx'
+      - 'lint/**'
+  push:
+    paths:
+      - 'mtsx/**/*.mtsx'
+      - 'lint/**'
+  workflow_dispatch:
+    inputs:
+      check_lv:
+        description: '检查等级'
+        required: true
+        default: 'lenient'
+        type: choice
+        options:
+          - lenient
+          - strict
+
+jobs:
+  build-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build regex-checker (Java)
+        working-directory: lint/regex-checker
+        run: mvn -q package
+
+      - name: Run Raku linter
+        working-directory: lint
+        run: |
+          curl https://rakubrew.org/install-on-perl.sh | bash
+          raku mtsx-lint.raku --mode ${{ inputs.check_lv }} --with-java regex-checker/target/regex-checker-0.1.0-jar-with-dependencies.jar --json > lint-result.json || true
+
+      - name: Convert to SARIF
+        run: |
+          raku lint/json-to-sarif.raku lint-result.json lint-result.sarif || true
+
+      - name: Upload lint result
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-result
+          path: lint-result.json
