@@ -1,4 +1,4 @@
-name: Build & Push MTSX Linter Image
+name: Build docker image
 
 on:
   push:
