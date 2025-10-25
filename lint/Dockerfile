@@ -7,7 +7,7 @@ RUN mvn -q -B package -DskipTests
 
 # ---------- final runtime image: use official Rakudo image ----------
 # 使用官方 rakudo 镜像，避免在构建时运行不稳定的安装脚本
-FROM raku/rakudo:latest
+FROM rakudo-star:latest
 
 # 安装 JRE-runtime 与必要工具
 RUN apt-get update \
