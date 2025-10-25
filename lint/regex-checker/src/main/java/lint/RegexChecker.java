@@ -112,15 +112,18 @@ public class RegexChecker {
             Automaton bb = rb.toAutomaton();
             aa.minimize();
             bb.minimize();
-            Automaton a_minus_b = Automaton.minus(aa, bb);
-            Automaton b_minus_a = Automaton.minus(bb, aa);
+
+            // Use instance methods for set operations (compatible with multiple automaton versions)
+            Automaton a_minus_b = aa.minus(bb); // strings in aa but not in bb
+            Automaton b_minus_a = bb.minus(aa); // strings in bb but not in aa
             if (a_minus_b.isEmpty() && b_minus_a.isEmpty()) {
                 r.status = "equal";
                 return r;
             }
             if (a_minus_b.isEmpty()) { r.status = "subset"; return r; }
             if (b_minus_a.isEmpty()) { r.status = "superset"; return r; }
-            Automaton inter = Automaton.intersection(aa, bb);
+
+            Automaton inter = aa.intersection(bb);
             if (!inter.isEmpty()) { r.status = "overlap"; return r; }
             r.status = "disjoint";
             return r;
