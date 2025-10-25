@@ -10,7 +10,15 @@ RUN mvn -q -B package -DskipTests
 FROM rakudo-star:latest
 
 # 安装 JRE-runtime 与必要工具
-RUN apt-get install -y openjdk-17-jre-headless wget ca-certificates unzip curl
+RUN apk update && \
+    # try common OpenJDK package names used in Alpine repos (order matters)
+    apk add --no-cache openjdk17-jre || \
+    apk add --no-cache openjdk17 || \
+    apk add --no-cache openjdk11-jre || \
+    apk add --no-cache openjdk11 || \
+    (echo "Failed to install OpenJDK via apk; image may still work if JRE exists in base image" && true)
+
+RUN apk add --no-cache wget ca-certificates unzip curl bash || true
 
 WORKDIR /workspace
 

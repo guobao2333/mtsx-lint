@@ -34,14 +34,13 @@ jobs:
 
       - name: Run linter inside container (produce JSON)
         run: |
-          docker run --rm -v "${{ github.workspace }}":/workspace -w /workspace \
+          docker run --rm -v "${GITHUB_WORKSPACE}":/workspace -w /workspace \
             ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest \
             raku lint/mtsx-lint.raku --mode lenient --with-java /opt/regex-checker.jar --json > lint-result.json || true
 
       - name: Convert JSON -> SARIF (container)
         run: |
-          # the converter is in the image at /workspace/lint/json-to-sarif.raku (copied by Dockerfile)
-          docker run --rm -v "${{ github.workspace }}":/workspace -w /workspace \
+          docker run --rm -v "${GITHUB_WORKSPACE}":/workspace -w /workspace \
             ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest \
             raku lint/json-to-sarif.raku lint-result.json lint-result.sarif || true
 
@@ -65,18 +64,17 @@ jobs:
             const r = JSON.parse(fs.readFileSync(path));
             const reports = r.reports || [];
             if (reports.length === 0) { core.info('No reports'); return; }
-            let body = '## mtsx-lint Report\\n';
-            body += '\\n_Source: automatic checks._\\n\\n';
+            let body = '## mtsx-lint Report\n\n_Source: automatic checks._\n\n';
             for (const rep of reports) {
               if ((rep.errors && rep.errors.length) || (rep.warnings && rep.warnings.length)) {
-                body += `### ${rep.file}\\n`;
+                body += `### ${rep.file}\n`;
                 if (rep.errors && rep.errors.length) {
-                  for (const e of rep.errors) { body += `- **ERROR**: ${e.message} (line:${e.line || '?'}, col:${e.col || '?'})\\n`; }
+                  for (const e of rep.errors) { body += `- **ERROR**: ${e.message} (line:${e.line || '?'}, col:${e.col || '?'})\n`; }
                 }
                 if (rep.warnings && rep.warnings.length) {
-                  for (const w of rep.warnings) { body += `- **WARN**: ${w.message} (line:${w.line || '?'}, col:${w.col || '?'})\\n`; }
+                  for (const w of rep.warnings) { body += `- **WARN**: ${w.message} (line:${w.line || '?'}, col:${w.col || '?'})\n`; }
                 }
-                body += '\\n';
+                body += '\n';
               }
             }
             const marker = '<!-- mtsx-lint:comment -->';
@@ -92,13 +90,13 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 comment_id: existing.id,
-                body: marker + '\\n' + body
+                body: marker + '\n' + body
               });
             } else {
               await github.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.payload.pull_request.number,
-                body: marker + '\\n' + body
+                body: marker + '\n' + body
               });
             }
