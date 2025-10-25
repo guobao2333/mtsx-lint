@@ -10,9 +10,7 @@ RUN mvn -q -B package -DskipTests
 FROM rakudo-star:latest
 
 # 安装 JRE-runtime 与必要工具
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends openjdk-17-jre-headless wget ca-certificates unzip curl \
-  && rm -rf /var/lib/apt/lists/*
+RUN apt-get install -y --no-install-recommends openjdk-17-jre-headless wget ca-certificates unzip curl
 
 WORKDIR /workspace
 
