@@ -40,7 +40,7 @@ jobs:
       - name: Run Raku linter
         working-directory: lint
         run: |
-          curl https://rakubrew.org/install-on-perl.sh | bash
+          curl https://rakubrew.org/install-on-perl.sh | sh
           raku mtsx-lint.raku --mode ${{ inputs.check_lv }} --with-java regex-checker/target/regex-checker-0.1.0-jar-with-dependencies.jar --json > lint-result.json || true
 
       - name: Convert to SARIF
