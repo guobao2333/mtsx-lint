@@ -46,8 +46,8 @@ jobs:
           echo "List workspace top-level:"
           ls -la "$GITHUB_WORKSPACE" || true
 
-          docker run --rm -v "${GITHUB_WORKSPACE}":/workspace -w /workspace ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest chmod 777 /workspace/lint/run-linter-safe.sh
-          docker run --rm -v "${GITHUB_WORKSPACE}":/workspace -w /workspace ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest /workspace/lint/run-linter-safe.sh --mode lenient --with-java /opt/regex-checker.jar --json
+          docker run --rm -v "${GITHUB_WORKSPACE}":/workspace -w /workspace ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest chmod +x ${{GITHUB_WORKSPACE}}/lint/run-linter-safe.sh
+          docker run --rm -v "${GITHUB_WORKSPACE}":/workspace -w /workspace ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest ${{GITHUB_WORKSPACE}}/lint/run-linter-safe.sh --mode lenient --with-java /opt/regex-checker.jar --json
           RC=$?
 
           echo "linter wrapper exit code: $RC"
