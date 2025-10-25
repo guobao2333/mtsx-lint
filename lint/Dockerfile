@@ -30,9 +30,6 @@ COPY --from=builder /build/lint/regex-checker/target/regex-checker-0.1.0-jar-wit
 # 把 linter 脚本复制到镜像
 COPY lint/ /workspace/lint/
 
-
-RUN chmod +x /workspace/lint/run-linter-safe.sh
-
 ENV PATH="/usr/local/bin:/usr/bin:/bin:${PATH}"
 
 WORKDIR /workspace
