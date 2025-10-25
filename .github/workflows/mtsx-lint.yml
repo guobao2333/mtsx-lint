@@ -1,54 +1,104 @@
-name: MTSX Lint
+name: Run mtsx Lint
 
 on:
   pull_request:
     paths:
       - 'mtsx/**/*.mtsx'
-      - 'lint/**'
   push:
     paths:
       - 'mtsx/**/*.mtsx'
-      - 'lint/**'
   workflow_dispatch:
-    inputs:
-      check_lv:
-        description: '检查等级'
-        required: true
-        default: 'lenient'
-        type: choice
-        options:
-          - lenient
-          - strict
+
+permissions:
+  contents: read
+  issues: write
+  packages: read # 从 GHCR 拉取镜像
 
 jobs:
-  build-and-lint:
+  run-linter:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - name: Log in to GHCR (for pulling)
+        uses: docker/login-action@v2
         with:
-          distribution: temurin
-          java-version: '17'
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build regex-checker (Java)
-        working-directory: lint/regex-checker
-        run: mvn -q package
-
-      - name: Run Raku linter
-        working-directory: lint
+      - name: Pull linter image
         run: |
-          curl https://rakubrew.org/install-on-perl.sh | sh
-          raku mtsx-lint.raku --mode ${{ inputs.check_lv }} --with-java regex-checker/target/regex-checker-0.1.0-jar-with-dependencies.jar --json > lint-result.json || true
+          docker pull ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest
 
-      - name: Convert to SARIF
+      - name: Run linter inside container (produce JSON)
         run: |
-          raku lint/json-to-sarif.raku lint-result.json lint-result.sarif || true
+          docker run --rm -v "${{ github.workspace }}":/workspace -w /workspace \
+            ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest \
+            raku lint/mtsx-lint.raku --mode lenient --with-java /opt/regex-checker.jar --json > lint-result.json || true
 
-      - name: Upload lint result
+      - name: Convert JSON -> SARIF (container)
+        run: |
+          # the converter is in the image at /workspace/lint/json-to-sarif.raku (copied by Dockerfile)
+          docker run --rm -v "${{ github.workspace }}":/workspace -w /workspace \
+            ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest \
+            raku lint/json-to-sarif.raku lint-result.json lint-result.sarif || true
+
+      - name: Upload lint result artifact
         uses: actions/upload-artifact@v4
         with:
           name: lint-result
-          path: lint-result.json
+          path: |
+            lint-result.json
+            lint-result.sarif
+
+      - name: Post or update PR comment with summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = 'lint-result.json';
+            if (!fs.existsSync(path)) { core.info('No lint-result.json found'); return; }
+            const r = JSON.parse(fs.readFileSync(path));
+            const reports = r.reports || [];
+            if (reports.length === 0) { core.info('No reports'); return; }
+            let body = '## mtsx-lint Report\\n';
+            body += '\\n_Source: automatic checks._\\n\\n';
+            for (const rep of reports) {
+              if ((rep.errors && rep.errors.length) || (rep.warnings && rep.warnings.length)) {
+                body += `### ${rep.file}\\n`;
+                if (rep.errors && rep.errors.length) {
+                  for (const e of rep.errors) { body += `- **ERROR**: ${e.message} (line:${e.line || '?'}, col:${e.col || '?'})\\n`; }
+                }
+                if (rep.warnings && rep.warnings.length) {
+                  for (const w of rep.warnings) { body += `- **WARN**: ${w.message} (line:${w.line || '?'}, col:${w.col || '?'})\\n`; }
+                }
+                body += '\\n';
+              }
+            }
+            const marker = '<!-- mtsx-lint:comment -->';
+            const comments = await github.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              per_page: 100
+            });
+            const existing = comments.data.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: marker + '\\n' + body
+              });
+            } else {
+              await github.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: marker + '\\n' + body
+              });
+            }
