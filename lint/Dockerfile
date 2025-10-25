@@ -1,7 +1,7 @@
 # Multi-stage: build the Java jar, then assemble runtime image with OpenJDK + Rakudo + jar
 
 # ---------- builder: build Java jar ----------
-FROM maven:3.9.4-openjdk-17 AS builder
+FROM maven:3.8.5-openjdk-17 AS builder
 
 WORKDIR /build
 # copy only the regex-checker module to speed layer caching
