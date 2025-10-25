@@ -8,6 +8,15 @@ on:
     paths:
       - 'mtsx/**/*.mtsx'
   workflow_dispatch:
+    inputs:
+      check_type:
+        description: '检查类型'
+        required: true
+        default: 'lenient'
+        type: choice
+        options:
+          - lenient
+          - strict
 
 permissions:
   contents: read
@@ -36,7 +45,7 @@ jobs:
         run: |
           docker run --rm -v "${GITHUB_WORKSPACE}":/workspace -w /workspace \
             ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest \
-            raku lint/mtsx-lint.raku --mode lenient --with-java /opt/regex-checker.jar --json > lint-result.json || true
+            raku lint/mtsx-lint.raku --mode ${{ inputs.check_type }} --with-java /opt/regex-checker.jar --json > lint-result.json || true
 
       - name: Convert JSON -> SARIF (container)
         run: |
