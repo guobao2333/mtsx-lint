@@ -1,3 +1,5 @@
+ARG TAG="latest"   # 可改为 trixie bookworm 或其他
+
 # ---------- builder: build Java jar ----------
 FROM maven:3.8.5-openjdk-17 AS builder
 WORKDIR /build
@@ -7,18 +9,15 @@ RUN mvn -q -B package -DskipTests
 
 # ---------- final runtime image: use official Rakudo image ----------
 # 使用官方 rakudo 镜像，避免在构建时运行不稳定的安装脚本
-FROM rakudo-star:latest
+FROM rakudo-star:${TAG}
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 # 安装 JRE-runtime 与必要工具
-RUN apk update && \
-    # try common OpenJDK package names used in Alpine repos (order matters)
-    apk add --no-cache openjdk17-jre || \
-    apk add --no-cache openjdk17 || \
-    apk add --no-cache openjdk11-jre || \
-    apk add --no-cache openjdk11 || \
-    (echo "Failed to install OpenJDK via apk; image may still work if JRE exists in base image" && true)
-
-RUN apk add --no-cache wget ca-certificates unzip curl bash || true
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      openjdk-17-jre-headless unzip wget ca-certificates curl bash gnupg \
+ && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
 
