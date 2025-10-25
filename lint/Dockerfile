@@ -16,7 +16,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # 安装 JRE-runtime 与必要工具
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      openjdk-17-jre-headless unzip wget ca-certificates curl bash gnupg \
+      default-jre unzip wget ca-certificates curl bash gnupg \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
