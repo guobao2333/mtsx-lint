@@ -13,6 +13,9 @@ FROM rakudo-star:${TAG}
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# 检查 raku
+RUN if ! command -v raku >/dev/null 2>&1; then echo "raku not found in image" >&2; exit 1; fi
+
 # 安装 JRE-runtime 与必要工具
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \

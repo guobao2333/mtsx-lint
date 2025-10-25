@@ -1,4 +1,4 @@
-name: Run MTSX Lint (pull image from GHCR, debug-friendly)
+name: Run MTSX Lint (debug)
 
 on:
   pull_request:
@@ -40,37 +40,49 @@ jobs:
           echo "=== list /workspace inside image (without mounting) ==="
           docker run --rm ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest bash -lc 'ls -la /workspace || true' || true
 
-      - name: Run linter inside container (produce JSON + debug)
+      - name: Run linter inside container (produce JSON + debug, safe)
         run: |
-          echo "=== Starting debug-run ==="
-          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+          echo "=== Starting debug-run (no host-side redirection) ==="
           echo "List workspace top-level:"
           ls -la "$GITHUB_WORKSPACE" || true
 
-          echo "--- check raku/java/jar inside image ---"
-          docker run --rm ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest raku --version || true
-          docker run --rm ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest java -version || true
-          docker run --rm ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest bash -lc 'if [ -f /opt/regex-checker.jar ]; then echo "/opt/regex-checker.jar exists"; ls -lh /opt/regex-checker.jar; else echo "/opt/regex-checker.jar NOT found"; fi' || true
-
-          echo "--- list /workspace inside container (mounted) ---"
-          docker run --rm -v "${{ github.workspace }}":/workspace -w /workspace ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest bash -lc 'pwd; ls -la; ls -la lint || true' || true
-
-          echo "--- run linter safe wrapper (capture stdout+stderr) ---"
-          docker run --rm -v "${{ github.workspace }}":/workspace -w /workspace ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest                 bash -lc 'set -x; /workspace/lint/run-linter-safe.sh --mode lenient --with-java /opt/regex-checker.jar --json' > lint-result.json 2> lint-run.log || true
+          # Run the safe wrapper inside the container; the wrapper writes files into /workspace (mounted)
+          docker run --rm -v "${GITHUB_WORKSPACE}":/workspace -w /workspace ghcr.io/${{ github.repository_owner }}/mtsx-linter:latest \
+            /workspace/lint/run-linter-safe.sh --mode lenient --with-java /opt/regex-checker.jar --json
           RC=$?
-          echo "linter wrapper exit code: $RC"
-          echo "----- lint-run.log (tail) -----"
-          tail -n 200 lint-run.log || true
-          echo "----- lint-result.json (head) -----"
-          head -n 200 lint-result.json || true
 
+          echo "linter wrapper exit code: $RC"
+
+          echo "----- lint-run.log (tail) -----"
+          if [ -f "$GITHUB_WORKSPACE/lint-run.log" ]; then
+            tail -n 200 "$GITHUB_WORKSPACE/lint-run.log" || true
+          else
+            echo "(no lint-run.log produced)"
+          fi
+
+          echo "----- lint-result.json (head) -----"
+          if [ -f "$GITHUB_WORKSPACE/lint-result.json" ]; then
+            head -n 200 "$GITHUB_WORKSPACE/lint-result.json" || true
+          else
+            echo "(no lint-result.json produced)"
+          fi
+
+          # Validate json with jq if available
           if command -v jq >/dev/null 2>&1; then
-            if jq -e . lint-result.json >/dev/null 2>&1; then
+            if [ -s "$GITHUB_WORKSPACE/lint-result.json" ] && jq -e . "$GITHUB_WORKSPACE/lint-result.json" >/dev/null 2>&1; then
               echo "lint-result.json is valid JSON"
             else
-              echo "lint-result.json invalid JSON"
+              echo "lint-result.json invalid or missing JSON"
+              exit 1
+            fi
+          else
+            # If jq not present, still fail if file missing or empty
+            if [ ! -s "$GITHUB_WORKSPACE/lint-result.json" ]; then
+              echo "lint-result.json missing or empty (jq not installed)"
+              exit 1
             fi
           fi
+
 
       - name: Upload lint result artifact
         uses: actions/upload-artifact@v4
